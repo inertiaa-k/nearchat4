@@ -43,14 +43,21 @@ if (fs.existsSync(publicPath)) {
 
 // 루트 경로 핸들러 추가
 app.get('/', (req, res) => {
-  const indexPath = path.join(__dirname, 'public', 'index.html');
-  console.log('index.html 경로:', indexPath);
+  // 먼저 루트 디렉토리에서 index.html 찾기
+  let indexPath = path.join(__dirname, 'index.html');
+  console.log('루트 index.html 경로:', indexPath);
+  
+  // 루트에 없으면 public 폴더에서 찾기
+  if (!fs.existsSync(indexPath)) {
+    indexPath = path.join(__dirname, 'public', 'index.html');
+    console.log('public index.html 경로:', indexPath);
+  }
   
   // 파일 존재 여부 확인
   if (fs.existsSync(indexPath)) {
     res.sendFile(indexPath);
   } else {
-    console.error('index.html 파일을 찾을 수 없습니다:', indexPath);
+    console.error('index.html 파일을 찾을 수 없습니다');
     
     // 기본 HTML 생성
     const defaultHTML = `<!DOCTYPE html>
