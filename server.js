@@ -21,7 +21,6 @@ app.use(express.json());
 
 // public 폴더 경로 설정 및 확인
 const publicPath = path.join(__dirname, 'public');
-const fs = require('fs');
 
 console.log('현재 디렉토리:', __dirname);
 console.log('public 폴더 경로:', publicPath);
