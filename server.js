@@ -19,45 +19,23 @@ const io = socketIo(server, {
 app.use(cors());
 app.use(express.json());
 
-// public 폴더 경로 설정 및 확인
-const publicPath = path.join(__dirname, 'public');
-
+// 정적 파일 서빙 설정
 console.log('현재 디렉토리:', __dirname);
-console.log('public 폴더 경로:', publicPath);
 
-// public 폴더가 존재하는지 확인
-if (fs.existsSync(publicPath)) {
-  console.log('✅ public 폴더가 존재합니다.');
-  app.use(express.static(publicPath));
-} else {
-  console.error('❌ public 폴더가 존재하지 않습니다:', publicPath);
-  // public 폴더 생성 시도
-  try {
-    fs.mkdirSync(publicPath, { recursive: true });
-    console.log('✅ public 폴더를 생성했습니다.');
-    app.use(express.static(publicPath));
-  } catch (error) {
-    console.error('❌ public 폴더 생성 실패:', error.message);
-  }
-}
+// 루트 디렉토리를 정적 파일 서빙으로 설정
+app.use(express.static(__dirname));
+console.log('✅ 루트 디렉토리를 정적 파일 서빙으로 설정했습니다.');
 
 // 루트 경로 핸들러 추가
 app.get('/', (req, res) => {
-  // 먼저 루트 디렉토리에서 index.html 찾기
-  let indexPath = path.join(__dirname, 'index.html');
-  console.log('루트 index.html 경로:', indexPath);
-  
-  // 루트에 없으면 public 폴더에서 찾기
-  if (!fs.existsSync(indexPath)) {
-    indexPath = path.join(__dirname, 'public', 'index.html');
-    console.log('public index.html 경로:', indexPath);
-  }
+  const indexPath = path.join(__dirname, 'index.html');
+  console.log('index.html 경로:', indexPath);
   
   // 파일 존재 여부 확인
   if (fs.existsSync(indexPath)) {
     res.sendFile(indexPath);
   } else {
-    console.error('index.html 파일을 찾을 수 없습니다');
+    console.error('index.html 파일을 찾을 수 없습니다:', indexPath);
     
     // 기본 HTML 생성
     const defaultHTML = `<!DOCTYPE html>
