@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: gps-chat
+    env: node
+    buildCommand: npm install && echo "Build completed"
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+    healthCheckPath: /health
+    autoDeploy: true
+    plan: free
