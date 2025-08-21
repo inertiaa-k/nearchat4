@@ -130,6 +130,11 @@ function setupSocketListeners() {
     // 새 메시지 수신
     socket.on('newMessage', (messageData) => {
         console.log('📨 새 메시지 수신:', messageData);
+        // 기존 환영 메시지 제거
+        const welcomeMessage = messagesContainer.querySelector('.welcome-message');
+        if (welcomeMessage) {
+            welcomeMessage.remove();
+        }
         addMessage(messageData, false);
         showToast(`${messageData.senderName}님의 메시지`, 'info');
     });
@@ -137,12 +142,38 @@ function setupSocketListeners() {
     // 메시지 전송 확인
     socket.on('messageSent', (messageData) => {
         console.log('✅ 메시지 전송 확인:', messageData);
+        // 기존 환영 메시지 제거
+        const welcomeMessage = messagesContainer.querySelector('.welcome-message');
+        if (welcomeMessage) {
+            welcomeMessage.remove();
+        }
         addMessage(messageData, true);
     });
     
     // 사용자 위치 업데이트
     socket.on('userLocationUpdated', (user) => {
         console.log(`${user.username}의 위치가 업데이트되었습니다.`);
+    });
+    
+    // 최근 메시지 수신
+    socket.on('recentMessages', (messages) => {
+        console.log('📨 최근 메시지 수신:', messages);
+        
+        if (messages.length > 0) {
+            // 기존 환영 메시지 제거
+            const welcomeMessage = messagesContainer.querySelector('.welcome-message');
+            if (welcomeMessage) {
+                welcomeMessage.remove();
+            }
+            
+            // 최근 메시지들을 시간순으로 표시
+            messages.forEach(messageData => {
+                const isOwnMessage = messageData.senderId === socket.id;
+                addMessage(messageData, isOwnMessage);
+            });
+            
+            showToast(`최근 대화 ${messages.length}개를 불러왔습니다.`, 'info');
+        }
     });
 }
 
