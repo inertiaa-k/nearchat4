@@ -123,7 +123,7 @@ if (!db) {
 // 연결된 사용자들을 저장하는 객체
 const connectedUsers = new Map();
 
-// 두 지점 간의 거리 계산 (미터 단위)
+// 두 지점 간의 거리 계산 (미터 단위) - Haversine 공식
 function calculateDistance(lat1, lon1, lat2, lon2) {
   const R = 6371e3; // 지구 반지름 (미터)
   const φ1 = lat1 * Math.PI / 180;
@@ -136,17 +136,29 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
     Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
-  return R * c;
+  const distance = R * c;
+  
+  // 거리 계산 결과 로깅 (디버깅용)
+  if (distance < 200) { // 200m 이내일 때만 로깅 (100m 범위를 고려)
+    console.log(`📏 거리 계산: (${lat1}, ${lon1}) ↔ (${lat2}, ${lon2}) = ${Math.round(distance)}m`);
+  }
+  
+  return distance;
 }
 
-// 근처 사용자 찾기 (30m 이내)
+// 근처 사용자 찾기 (100m 이내)
 function findNearbyUsers(latitude, longitude, excludeSocketId = null) {
   const nearbyUsers = [];
+  
+  console.log(`🔍 위치 (${latitude}, ${longitude})에서 근처 사용자 검색 중...`);
+  console.log(`📊 현재 연결된 사용자 수: ${connectedUsers.size}`);
   
   connectedUsers.forEach((user, socketId) => {
     if (socketId !== excludeSocketId && user.latitude && user.longitude) {
       const distance = calculateDistance(latitude, longitude, user.latitude, user.longitude);
-      if (distance <= 30) { // 30미터 이내
+      console.log(`👤 ${user.username}: ${Math.round(distance)}m 거리`);
+      
+      if (distance <= 100) { // 100미터 이내
         nearbyUsers.push({
           socketId,
           username: user.username,
@@ -154,10 +166,12 @@ function findNearbyUsers(latitude, longitude, excludeSocketId = null) {
           latitude: user.latitude,
           longitude: user.longitude
         });
+        console.log(`✅ ${user.username} 추가됨 (${Math.round(distance)}m)`);
       }
     }
   });
   
+  console.log(`🎯 총 ${nearbyUsers.length}명의 근처 사용자 발견`);
   return nearbyUsers;
 }
 
@@ -168,6 +182,10 @@ io.on('connection', (socket) => {
   // 사용자 등록
   socket.on('register', (data) => {
     const { username, latitude, longitude } = data;
+    
+    console.log(`\n🚀 새 사용자 등록: ${username}`);
+    console.log(`📍 위치: ${latitude}, ${longitude}`);
+    console.log(`🆔 Socket ID: ${socket.id}`);
     
     connectedUsers.set(socket.id, {
       username,
@@ -186,18 +204,26 @@ io.on('connection', (socket) => {
 
     // 근처 사용자들에게 새 사용자 알림
     const nearbyUsers = findNearbyUsers(latitude, longitude, socket.id);
-    nearbyUsers.forEach(user => {
-      io.to(user.socketId).emit('userJoined', {
-        socketId: socket.id,
-        username,
-        distance: user.distance
+    
+    if (nearbyUsers.length > 0) {
+      console.log(`📢 ${nearbyUsers.length}명에게 새 사용자 알림 전송`);
+      nearbyUsers.forEach(user => {
+        console.log(`  → ${user.username}에게 알림 전송 (${user.distance}m)`);
+        io.to(user.socketId).emit('userJoined', {
+          socketId: socket.id,
+          username,
+          distance: user.distance
+        });
       });
-    });
+    } else {
+      console.log(`⚠️ 근처에 다른 사용자가 없습니다.`);
+    }
 
     // 새 사용자에게 근처 사용자 목록 전송
     socket.emit('nearbyUsers', nearbyUsers);
+    console.log(`📋 ${username}에게 ${nearbyUsers.length}명의 근처 사용자 목록 전송`);
     
-    console.log(`${username}님이 등록되었습니다. (${latitude}, ${longitude})`);
+    console.log(`✅ ${username}님 등록 완료\n`);
   });
 
   // 위치 업데이트
@@ -238,6 +264,10 @@ io.on('connection', (socket) => {
     const user = connectedUsers.get(socket.id);
     
     if (user && user.latitude && user.longitude) {
+      console.log(`\n💬 메시지 전송: ${user.username}`);
+      console.log(`📝 내용: ${message}`);
+      console.log(`📍 위치: ${user.latitude}, ${user.longitude}`);
+      
       const nearbyUsers = findNearbyUsers(user.latitude, user.longitude, socket.id);
       
       // 근처 사용자들에게 메시지 전송
@@ -250,9 +280,15 @@ io.on('connection', (socket) => {
         timestamp: new Date().toISOString()
       };
 
-      nearbyUsers.forEach(nearbyUser => {
-        io.to(nearbyUser.socketId).emit('newMessage', messageData);
-      });
+      if (nearbyUsers.length > 0) {
+        console.log(`📤 ${nearbyUsers.length}명에게 메시지 전송`);
+        nearbyUsers.forEach(nearbyUser => {
+          console.log(`  → ${nearbyUser.username}에게 전송 (${nearbyUser.distance}m)`);
+          io.to(nearbyUser.socketId).emit('newMessage', messageData);
+        });
+      } else {
+        console.log(`⚠️ 근처에 메시지를 받을 사용자가 없습니다.`);
+      }
 
       // 발신자에게도 메시지 전송 (확인용)
       socket.emit('messageSent', messageData);
@@ -265,7 +301,9 @@ io.on('connection', (socket) => {
         );
       }
 
-      console.log(`${user.username}: ${message}`);
+      console.log(`✅ 메시지 전송 완료\n`);
+    } else {
+      console.log(`❌ 메시지 전송 실패: 사용자 정보 또는 위치 정보 없음`);
     }
   });
 
@@ -310,7 +348,7 @@ app.get('/api/users', (req, res) => {
 });
 
 app.get('/api/messages', (req, res) => {
-  const { lat, lon, radius = 30 } = req.query;
+  const { lat, lon, radius = 100 } = req.query;
   
   if (lat && lon && db) {
     db.all(
