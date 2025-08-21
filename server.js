@@ -139,14 +139,14 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
   const distance = R * c;
   
   // 거리 계산 결과 로깅 (디버깅용)
-  if (distance < 200) { // 200m 이내일 때만 로깅 (100m 범위를 고려)
+  if (distance < 1000) { // 1000m 이내일 때만 로깅 (500m 범위를 고려)
     console.log(`📏 거리 계산: (${lat1}, ${lon1}) ↔ (${lat2}, ${lon2}) = ${Math.round(distance)}m`);
   }
   
   return distance;
 }
 
-// 근처 사용자 찾기 (100m 이내)
+// 근처 사용자 찾기 (500m 이내)
 function findNearbyUsers(latitude, longitude, excludeSocketId = null) {
   const nearbyUsers = [];
   
@@ -158,7 +158,7 @@ function findNearbyUsers(latitude, longitude, excludeSocketId = null) {
       const distance = calculateDistance(latitude, longitude, user.latitude, user.longitude);
       console.log(`👤 ${user.username}: ${Math.round(distance)}m 거리`);
       
-      if (distance <= 100) { // 100미터 이내
+      if (distance <= 500) { // 500미터 이내
         nearbyUsers.push({
           socketId,
           username: user.username,
@@ -222,6 +222,33 @@ io.on('connection', (socket) => {
     // 새 사용자에게 근처 사용자 목록 전송
     socket.emit('nearbyUsers', nearbyUsers);
     console.log(`📋 ${username}에게 ${nearbyUsers.length}명의 근처 사용자 목록 전송`);
+    
+    // 새 사용자에게 최근 메시지 5개 전송
+    if (db) {
+      db.all(
+        'SELECT * FROM messages WHERE timestamp > datetime("now", "-1 hour") ORDER BY timestamp DESC LIMIT 5',
+        (err, rows) => {
+          if (err) {
+            console.log('최근 메시지 조회 오류:', err.message);
+          } else {
+            // 위치 기반 필터링 (500m 이내)
+            const nearbyMessages = rows.filter(row => {
+              const distance = calculateDistance(latitude, longitude, row.latitude, row.longitude);
+              return distance <= 500;
+            });
+            
+            if (nearbyMessages.length > 0) {
+              console.log(`📨 ${username}에게 최근 메시지 ${nearbyMessages.length}개 전송`);
+              socket.emit('recentMessages', nearbyMessages.reverse()); // 시간순으로 정렬
+            } else {
+              console.log(`📨 ${username}에게 전송할 최근 메시지가 없습니다.`);
+            }
+          }
+        }
+      );
+    } else {
+      console.log(`📨 데이터베이스 없음: ${username}에게 최근 메시지 전송 건너뜀`);
+    }
     
     console.log(`✅ ${username}님 등록 완료\n`);
   });
@@ -348,7 +375,7 @@ app.get('/api/users', (req, res) => {
 });
 
 app.get('/api/messages', (req, res) => {
-  const { lat, lon, radius = 100 } = req.query;
+  const { lat, lon, radius = 500 } = req.query;
   
   if (lat && lon && db) {
     db.all(
