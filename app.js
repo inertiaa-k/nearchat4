@@ -105,7 +105,14 @@ function setupSocketListeners() {
     socket.on('nearbyUsers', (users) => {
         nearbyUsers = users;
         updateNearbyCount();
-        console.log('근처 사용자:', users);
+        console.log('📋 근처 사용자 목록 수신:', users);
+        console.log(`👥 총 ${users.length}명의 근처 사용자`);
+        
+        if (users.length === 0) {
+            showToast('근처에 다른 사용자가 없습니다.', 'info');
+        } else {
+            showToast(`${users.length}명의 근처 사용자를 발견했습니다!`, 'success');
+        }
     });
     
     // 새 사용자 참가
@@ -122,11 +129,14 @@ function setupSocketListeners() {
     
     // 새 메시지 수신
     socket.on('newMessage', (messageData) => {
+        console.log('📨 새 메시지 수신:', messageData);
         addMessage(messageData, false);
+        showToast(`${messageData.senderName}님의 메시지`, 'info');
     });
     
     // 메시지 전송 확인
     socket.on('messageSent', (messageData) => {
+        console.log('✅ 메시지 전송 확인:', messageData);
         addMessage(messageData, true);
     });
     
